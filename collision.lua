@@ -1,5 +1,3 @@
-TILE_SIZE = 8
-
 UP = 1
 DOWN = 2
 LEFT = 3

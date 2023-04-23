@@ -1,8 +1,12 @@
-require "player"
-require "camera"
-
 love.graphics.setDefaultFilter("nearest")
 
+require "player"
+require "camera"
+require "map"
+
+local map = Map.new()
+map:generate()
+map:batch()
 local player = Player.new()
 
 Enemy = {
@@ -69,7 +73,7 @@ function love.update(dt)
     local mouseX = love.mouse.getX()
     local mouseY = love.mouse.getY()
 
-    player:move(dx, dy, dt)
+    player:move(map, dx, dy, dt)
     player:look(mouseX, mouseY)
     player:update(enemies, dt)
 end
@@ -79,6 +83,8 @@ function love.draw()
 
     love.graphics.push()
     love.graphics.scale(Camera.VIEW_SCALE, Camera.VIEW_SCALE)
+
+    map:draw()
 
     for _, enemy in ipairs(enemies) do
         love.graphics.draw(Enemy.SPRITE, enemy.x, enemy.y)

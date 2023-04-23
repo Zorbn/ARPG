@@ -1,5 +1,6 @@
 require "collision"
 require "camera"
+require "map"
 
 Player = {}
 
@@ -35,10 +36,10 @@ function Player.new()
         },
     }
 
-    local playerFrameCount = player.topSprite:getWidth() / TILE_SIZE
+    local playerFrameCount = player.topSprite:getWidth() / Map.TILE_SIZE
     for i = 1, playerFrameCount do
-        local texX = (i - 1) * TILE_SIZE
-        local frame = love.graphics.newQuad(texX, 0, TILE_SIZE, TILE_SIZE, player.topSprite)
+        local texX = (i - 1) * Map.TILE_SIZE
+        local frame = love.graphics.newQuad(texX, 0, Map.TILE_SIZE, Map.TILE_SIZE, player.topSprite)
         player.topFrames[i] = frame
         player.bottomFrames[i] = frame
     end
@@ -60,15 +61,33 @@ function Player.new()
         self.sword.targetSwingAngle = -self.sword.targetSwingAngle
     end
 
-    function player.move(self, dx, dy, dt)
+    function player.move(self, map, dx, dy, dt)
         local dmag = math.sqrt(dx * dx + dy * dy)
 
         if dmag ~= 0 then
             dx = dx / dmag
             dy = dy / dmag
 
-            self.x = self.x + dx * dt * self.speed
-            self.y = self.y + dy * dt * self.speed
+            local nextX = self.x + dx * dt * self.speed
+            local nextY = self.y + dy * dt * self.speed
+
+            local playerSize = Map.TILE_SIZE * 0.95
+
+            local collisionX = nextX + (dx > 0 and playerSize or 0)
+            if map:getTileFromPos(collisionX, self.y) ~= 0 or
+                map:getTileFromPos(collisionX, self.y + playerSize) ~= 0 then
+                nextX = self.x
+            end
+
+            self.x = nextX
+
+            local collisionY = nextY + (dy > 0 and playerSize or 0)
+            if map:getTileFromPos(self.x, collisionY) ~= 0 or
+                map:getTileFromPos(self.x + playerSize, collisionY) ~= 0 then
+                nextY = self.y
+            end
+
+            self.y = nextY
         end
     end
 
@@ -107,18 +126,18 @@ function Player.new()
 
         local swordAngle = self.sword.angle + self.sword.swingAngle
 
-        local swordHitboxX = self.x + 1.5 * TILE_SIZE
-        local swordHitboxY = self.y + 0.5 * TILE_SIZE
-        swordHitboxX, swordHitboxY = Collision.rotateAround(swordHitboxX, swordHitboxY, self.x + TILE_SIZE * 0.5,
-        self.y + TILE_SIZE * 0.5, swordAngle)
-        local swordX1 = swordHitboxX - 0.5 * TILE_SIZE
-        local swordX2 = swordHitboxX + 0.5 * TILE_SIZE
-        local swordY1 = swordHitboxY - 0.5 * TILE_SIZE
-        local swordY2 = swordHitboxY + 0.5 * TILE_SIZE
+        local swordHitboxX = self.x + 1.5 * Map.TILE_SIZE
+        local swordHitboxY = self.y + 0.5 * Map.TILE_SIZE
+        swordHitboxX, swordHitboxY = Collision.rotateAround(swordHitboxX, swordHitboxY, self.x + Map.TILE_SIZE * 0.5,
+        self.y + Map.TILE_SIZE * 0.5, swordAngle)
+        local swordX1 = swordHitboxX - 0.5 * Map.TILE_SIZE
+        local swordX2 = swordHitboxX + 0.5 * Map.TILE_SIZE
+        local swordY1 = swordHitboxY - 0.5 * Map.TILE_SIZE
+        local swordY2 = swordHitboxY + 0.5 * Map.TILE_SIZE
 
         for i, enemy in ipairs(enemies) do
-            if self.sword.isSwinging and Collision.checkCollisionRect(enemy.x, enemy.y, enemy.x + TILE_SIZE,
-                    enemy.y + TILE_SIZE, swordX1, swordY1, swordX2, swordY2) then
+            if self.sword.isSwinging and Collision.checkCollisionRect(enemy.x, enemy.y, enemy.x + Map.TILE_SIZE,
+                    enemy.y + Map.TILE_SIZE, swordX1, swordY1, swordX2, swordY2) then
                 -- Don't hit an enemy that has already been hit this swing.
                 if self.sword.hits[enemy] == nil and enemy:takeDamage(self.sword.damage) then
                     -- The enemy is dead.
