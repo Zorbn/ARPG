@@ -1,14 +1,3 @@
-local testArray = {}
-for i = 1, 5 do
-    testArray[i] = i
-end
-
-testArray[4] = nil
-
-for i, n in ipairs(testArray) do
-    print(i, n)
-end
-
 love.graphics.setDefaultFilter("nearest")
 
 local VIEW_SCALE = 4
@@ -52,6 +41,12 @@ local player = {
         targetSwingAngle = 0,
         swingAngle = 0,
         scaleY = 1,
+        isSwinging = false,
+        damage = 25,
+        hits = {},
+        -- The sword is not longer swing when it is within
+        -- this distance to the target swing angle.
+        stopDistance = 0.4,
     },
     arms = {
         sprite = love.graphics.newImage("playerArms.png"),
@@ -90,7 +85,7 @@ function Enemy.new(x, y)
     function enemy.takeDamage(self, damage)
         self.health = self.health - damage
 
-        if self.health < 0 then
+        if self.health <= 0 then
             return true
         end
 
@@ -110,7 +105,8 @@ function love.resize(w, h)
 end
 
 function love.mousepressed(x, y, button, istouch, presses)
-    if button == 1 then
+    if button == 1 and not player.sword.isSwinging then
+        player.sword.isSwinging = true
         player.sword.targetSwingAngle = -player.sword.targetSwingAngle
         player.sword.scaleY = -player.sword.scaleY
     end
@@ -154,6 +150,38 @@ function love.update(dt)
     player.sword.swingAngle = player.sword.swingAngle + (player.sword.targetSwingAngle -
         player.sword.swingAngle) * player.sword.SWING_SPEED * dt
 
+    if player.sword.isSwinging and math.abs(player.sword.swingAngle - player.sword.targetSwingAngle) < player.sword.stopDistance then
+        player.sword.isSwinging = false
+
+        for enemy, _ in pairs(player.sword.hits) do
+            player.sword.hits[enemy] = nil
+        end
+    end
+
+    local swordAngle = player.sword.angle + player.sword.swingAngle
+
+    local swordHitboxX = player.x + 1.5 * TILE_SIZE
+    local swordHitboxY = player.y + 0.5 * TILE_SIZE
+    swordHitboxX, swordHitboxY = rotateAround(swordHitboxX, swordHitboxY, player.x + TILE_SIZE * 0.5,
+    player.y + TILE_SIZE * 0.5, swordAngle)
+    local swordX1 = swordHitboxX - 0.5 * TILE_SIZE
+    local swordX2 = swordHitboxX + 0.5 * TILE_SIZE
+    local swordY1 = swordHitboxY - 0.5 * TILE_SIZE
+    local swordY2 = swordHitboxY + 0.5 * TILE_SIZE
+
+    for i, enemy in ipairs(enemies) do
+        if player.sword.isSwinging and checkCollisionRect(enemy.x, enemy.y, enemy.x + TILE_SIZE,
+                enemy.y + TILE_SIZE, swordX1, swordY1, swordX2, swordY2) then
+            -- Don't hit an enemy that has already been hit this swing.
+            if player.sword.hits[enemy] == nil and enemy:takeDamage(player.sword.damage) then
+                -- The enemy is dead.
+                table.remove(enemies, i)
+            end
+
+            player.sword.hits[enemy] = true
+        end
+    end
+
     -- Get the player's angle in 90 degree increments
     -- Shifted by 45 degrees so that the increments are
     -- centered on the player's cardinal directions.
@@ -176,40 +204,19 @@ function love.draw()
     love.graphics.push()
     love.graphics.scale(VIEW_SCALE, VIEW_SCALE)
 
-    local swordAngle = player.sword.angle + player.sword.swingAngle
-
-    local swordHitboxX = player.x + 1.5 * TILE_SIZE
-    local swordHitboxY = player.y + 0.5 * TILE_SIZE
-    swordHitboxX, swordHitboxY = rotateAround(swordHitboxX, swordHitboxY, player.x + TILE_SIZE * 0.5, player.y + TILE_SIZE * 0.5, swordAngle)
-    local swordX1 = swordHitboxX - 0.5 * TILE_SIZE
-    local swordX2 = swordHitboxX + 0.5 * TILE_SIZE
-    local swordY1 = swordHitboxY - 0.5 * TILE_SIZE
-    local swordY2 = swordHitboxY + 0.5 * TILE_SIZE
-
-    for i, enemy in ipairs(enemies) do
+    for _, enemy in ipairs(enemies) do
         love.graphics.draw(Enemy.SPRITE, enemy.x, enemy.y)
-
-        if checkCollisionRect(enemy.x, enemy.y, enemy.x + TILE_SIZE,
-            enemy.y + TILE_SIZE, swordX1, swordY1, swordX2, swordY2) then
-
-            if enemy:takeDamage(25) then
-                table.remove(enemies, i)
-            end
-        end
     end
 
     love.graphics.draw(player.bottomSprite, player.bottomFrames[player.direction], player.x, player.y)
 
+    local swordAngle = player.sword.angle + player.sword.swingAngle
     love.graphics.draw(player.arms.sprite, player.x + player.sword.x, player.y + player.sword.y,
         swordAngle, 1, player.sword.scaleY, -player.arms.width * 0.2, player.arms.height * 0.5)
     love.graphics.draw(player.sword.sprite, player.x + player.sword.x, player.y + player.sword.y,
         swordAngle, 1, player.sword.scaleY, -player.sword.width * 0.6, player.sword.height * 0.5)
 
     love.graphics.draw(player.topSprite, player.topFrames[player.direction], player.x, player.y)
-
-    love.graphics.setColor(1.0, 0.0, 0.0, 1.0)
-    love.graphics.points(swordX1, swordY1, swordX2, swordY2)
-    love.graphics.setColor(1.0, 1.0, 1.0, 1.0)
 
     love.graphics.pop()
 end
