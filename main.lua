@@ -3,6 +3,7 @@ love.graphics.setDefaultFilter("nearest")
 require "player"
 require "camera"
 require "map"
+require "pathfinding"
 
 local map = Map.new()
 map:generate()
@@ -73,9 +74,20 @@ end
 
 camera:resize(love.graphics.getWidth(), love.graphics.getHeight())
 
+map:setTile(7, 1, 0)
+local cameFrom = Pathfinding.aStarSearch(map, 1, 1, 7, 1)
+local path = Pathfinding.reconstructPath(1, 1, {x = 7, y = 1}, cameFrom)
+local pathI = #path
+
 function love.mousepressed(x, y, button, istouch, presses)
     if button == 1 then
         player:swingSword()
+    end
+
+    if button == 2 then
+        player.x = (path[pathI].x - 1) * Map.TILE_SIZE
+        player.y = (path[pathI].y - 1) * Map.TILE_SIZE
+        pathI = pathI - 1
     end
 end
 

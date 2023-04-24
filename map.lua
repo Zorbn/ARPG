@@ -17,15 +17,15 @@ function Map.new()
             return
         end
 
-        self.tiles[x + y * Map.WIDTH] = tile
+        self.tiles[x + (y - 1) * Map.WIDTH] = tile
     end
 
     function map.getTile(self, x, y)
         if x < 1 or x > Map.WIDTH or y < 1 or y > Map.HEIGHT then
-            return 0
+            return 1
         end
 
-        return self.tiles[x + y * Map.WIDTH]
+        return self.tiles[x + (y - 1) * Map.WIDTH]
     end
 
     function map.getTileFromPos(self, x, y)
@@ -39,9 +39,9 @@ function Map.new()
         for y = 1, Map.HEIGHT do
             for x = 1, Map.WIDTH do
                 if math.random() < 0.2 then
-                    self.tiles[x + y * Map.WIDTH] = 1
+                    self:setTile(x, y, 1)
                 else
-                    self.tiles[x + y * Map.WIDTH] = 0
+                    self:setTile(x, y, 0)
                 end
             end
         end
@@ -50,7 +50,7 @@ function Map.new()
     function map.batch(self)
         for y = 1, Map.HEIGHT do
             for x = 1, Map.WIDTH do
-                if self.tiles[x + y * Map.WIDTH] == 1 then
+                if self:getTile(x, y) == 1 then
                     self.spriteBatch:add((x - 1) * Map.TILE_SIZE, (y - 1) * Map.TILE_SIZE)
                 end
             end
@@ -64,7 +64,7 @@ function Map.new()
     function map.spawnEnemies(self, enemies)
         for y = 1, Map.HEIGHT do
             for x = 1, Map.WIDTH do
-                if self.tiles[x + y * Map.WIDTH] == 0 and
+                if self:getTile(x, y) == 0 and
                     math.random() < 0.02 then
                     local enemyX = (x - 1) * Map.TILE_SIZE
                     local enemyY = (y - 1) * Map.TILE_SIZE
