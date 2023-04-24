@@ -13,6 +13,7 @@ function Player.new()
         direction = DOWN,
         x = 0,
         y = 0,
+        size = Map.TILE_SIZE * 0.95,
         speed = 50,
         sword = {
             sprite = love.graphics.newImage("sword.png"),
@@ -71,19 +72,17 @@ function Player.new()
             local nextX = self.x + dx * dt * self.speed
             local nextY = self.y + dy * dt * self.speed
 
-            local playerSize = Map.TILE_SIZE * 0.95
-
-            local collisionX = nextX + (dx > 0 and playerSize or 0)
+            local collisionX = nextX + (dx > 0 and self.size or 0)
             if map:getTileFromPos(collisionX, self.y) ~= 0 or
-                map:getTileFromPos(collisionX, self.y + playerSize) ~= 0 then
+                map:getTileFromPos(collisionX, self.y + self.size) ~= 0 then
                 nextX = self.x
             end
 
             self.x = nextX
 
-            local collisionY = nextY + (dy > 0 and playerSize or 0)
+            local collisionY = nextY + (dy > 0 and self.size or 0)
             if map:getTileFromPos(self.x, collisionY) ~= 0 or
-                map:getTileFromPos(self.x + playerSize, collisionY) ~= 0 then
+                map:getTileFromPos(self.x + self.size, collisionY) ~= 0 then
                 nextY = self.y
             end
 
@@ -91,8 +90,10 @@ function Player.new()
         end
     end
 
-    function player.look(self, mouseX, mouseY)
-        local playerAngleToMouse = math.atan2(mouseY * Camera.INV_VIEW_SCALE - self.y, mouseX * Camera.INV_VIEW_SCALE - self.x)
+    function player.look(self, camera, mouseX, mouseY)
+        mouseX = mouseX * camera.invScale + camera.x
+        mouseY = mouseY * camera.invScale + camera.y
+        local playerAngleToMouse = math.atan2(mouseY - self.y, mouseX - self.x)
         self.sword.angle = playerAngleToMouse
 
         -- Get the player's angle in 90 degree increments

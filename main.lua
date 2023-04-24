@@ -8,6 +8,7 @@ local map = Map.new()
 map:generate()
 map:batch()
 local player = Player.new()
+local camera = Camera.new()
 
 Enemy = {
     SPEED = 30,
@@ -42,7 +43,10 @@ table.insert(enemies, Enemy.new(25, 25))
 table.insert(enemies, Enemy.new(0, 0))
 
 function love.resize(w, h)
+    camera:resize(w, h)
 end
+
+camera:resize(love.graphics.getWidth(), love.graphics.getHeight())
 
 function love.mousepressed(x, y, button, istouch, presses)
     if button == 1 then
@@ -74,15 +78,17 @@ function love.update(dt)
     local mouseY = love.mouse.getY()
 
     player:move(map, dx, dy, dt)
-    player:look(mouseX, mouseY)
+    player:look(camera, mouseX, mouseY)
     player:update(enemies, dt)
+    camera:focus(player.x, player.y)
 end
 
 function love.draw()
     love.graphics.clear(0.4, 0.4, 0.4)
 
     love.graphics.push()
-    love.graphics.scale(Camera.VIEW_SCALE, Camera.VIEW_SCALE)
+    love.graphics.scale(camera.scale, camera.scale)
+    love.graphics.translate(-camera.x, -camera.y)
 
     map:draw()
 
