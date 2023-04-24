@@ -20,6 +20,7 @@ function Player.new()
             x = 4,
             y = 4,
             angle = 0,
+            KNOCKBACK_FORCE = 300,
             MAX_SWING_ANGLE = -math.pi * 0.7,
             SWING_SPEED = 15,
             targetSwingAngle = 0,
@@ -72,17 +73,15 @@ function Player.new()
             local nextX = self.x + dx * dt * self.speed
             local nextY = self.y + dy * dt * self.speed
 
-            local collisionX = nextX + (dx > 0 and self.size or 0)
-            if map:getTileFromPos(collisionX, self.y) ~= 0 or
-                map:getTileFromPos(collisionX, self.y + self.size) ~= 0 then
+            if Collision.checkCollisionRectAndMap(map, nextX, self.y,
+                nextX + self.size, self.y + self.size) then
                 nextX = self.x
             end
 
             self.x = nextX
 
-            local collisionY = nextY + (dy > 0 and self.size or 0)
-            if map:getTileFromPos(self.x, collisionY) ~= 0 or
-                map:getTileFromPos(self.x + self.size, collisionY) ~= 0 then
+            if Collision.checkCollisionRectAndMap(map, self.x, nextY,
+                self.x + self.size, nextY + self.size) then
                 nextY = self.y
             end
 
@@ -137,16 +136,33 @@ function Player.new()
         local swordY2 = swordHitboxY + 0.5 * Map.TILE_SIZE
 
         for i, enemy in ipairs(enemies) do
-            if self.sword.isSwinging and Collision.checkCollisionRect(enemy.x, enemy.y, enemy.x + Map.TILE_SIZE,
-                    enemy.y + Map.TILE_SIZE, swordX1, swordY1, swordX2, swordY2) then
+            repeat
+                if not self.sword.isSwinging or not Collision.checkCollisionRect(enemy.x, enemy.y, enemy.x + Map.TILE_SIZE,
+                        enemy.y + Map.TILE_SIZE, swordX1, swordY1, swordX2, swordY2) then
+                    break
+                end
+
                 -- Don't hit an enemy that has already been hit this swing.
-                if self.sword.hits[enemy] == nil and enemy:takeDamage(self.sword.damage) then
+                if self.sword.hits[enemy] ~= nil then
+                    break
+                end
+
+                local dirX = enemy.x - self.x
+                local dirY = enemy.y - self.y
+                local dirMag = math.sqrt(dirX * dirX + dirY * dirY)
+                dirX = dirX / dirMag
+                dirY = dirY / dirMag
+
+                enemy.velocityX = enemy.velocityX + dirX * player.sword.KNOCKBACK_FORCE
+                enemy.velocityY = enemy.velocityY + dirY * player.sword.KNOCKBACK_FORCE
+
+                if enemy:takeDamage(self.sword.damage) then
                     -- The enemy is dead.
                     table.remove(enemies, i)
                 end
 
                 self.sword.hits[enemy] = true
-            end
+            until true
         end
     end
 

@@ -14,12 +14,15 @@ Enemy = {
     SPEED = 30,
     MAX_HEALTH = 50,
     SPRITE = love.graphics.newImage("playerOld.png"),
+    SIZE = Map.TILE_SIZE * 0.95
 }
 
 function Enemy.new(x, y)
     local enemy = {
         x = x,
         y = y,
+        velocityX = 0,
+        velocityY = 0,
         health = Enemy.MAX_HEALTH,
     }
 
@@ -33,14 +36,36 @@ function Enemy.new(x, y)
         return false
     end
 
+    function enemy.update(self, map, dt)
+        local nextX = self.x + self.velocityX * dt
+        local nextY = self.y + self.velocityY * dt
+
+        if Collision.checkCollisionRectAndMap(map, nextX, self.y,
+            nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
+            nextX = self.x
+            self.velocityX = -self.velocityX
+        end
+
+        self.x = nextX
+
+        if Collision.checkCollisionRectAndMap(map, self.x, nextY,
+            self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
+            nextY = self.y
+            self.velocityY = -self.velocityY
+        end
+
+        self.y = nextY
+
+        self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
+        self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
+    end
+
     return enemy
 end
 
 local enemies = {}
 
-table.insert(enemies, Enemy.new(50, 50))
-table.insert(enemies, Enemy.new(25, 25))
-table.insert(enemies, Enemy.new(0, 0))
+map:spawnEnemies(enemies)
 
 function love.resize(w, h)
     camera:resize(w, h)
@@ -76,6 +101,10 @@ function love.update(dt)
 
     local mouseX = love.mouse.getX()
     local mouseY = love.mouse.getY()
+
+    for _, enemy in ipairs(enemies) do
+        enemy:update(map, dt)
+    end
 
     player:move(map, dx, dy, dt)
     player:look(camera, mouseX, mouseY)

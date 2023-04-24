@@ -61,5 +61,18 @@ function Map.new()
         love.graphics.draw(self.spriteBatch, 0, 0)
     end
 
+    function map.spawnEnemies(self, enemies)
+        for y = 1, Map.HEIGHT do
+            for x = 1, Map.WIDTH do
+                if self.tiles[x + y * Map.WIDTH] == 0 and
+                    math.random() < 0.02 then
+                    local enemyX = (x - 1) * Map.TILE_SIZE
+                    local enemyY = (y - 1) * Map.TILE_SIZE
+                    table.insert(enemies, Enemy.new(enemyX, enemyY))
+                end
+            end
+        end
+    end
+
     return map
 end
