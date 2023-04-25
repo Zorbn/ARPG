@@ -15,8 +15,11 @@ Enemy = {
     SPEED = 30,
     MAX_HEALTH = 50,
     SPRITE = love.graphics.newImage("playerOld.png"),
-    SIZE = Map.TILE_SIZE * 0.95
+    SIZE = Map.TILE_SIZE * 0.95,
+    PATHING_NODE_STOP_DISTANCE = Map.TILE_SIZE * 0.1,
 }
+
+Enemy.PATHING_PADDING = (Map.TILE_SIZE - Enemy.SIZE) * 0.5
 
 function Enemy.new(x, y)
     local enemy = {
@@ -25,7 +28,11 @@ function Enemy.new(x, y)
         velocityX = 0,
         velocityY = 0,
         health = Enemy.MAX_HEALTH,
+        path = Pathfinding.aStar(map, math.floor(x / Map.TILE_SIZE) + 1, math.floor(y / Map.TILE_SIZE) + 1, 1, 1)
     }
+
+    enemy.pathI = #enemy.path
+    print(enemy.pathI)
 
     function enemy.takeDamage(self, damage)
         self.health = self.health - damage
@@ -38,27 +45,69 @@ function Enemy.new(x, y)
     end
 
     function enemy.update(self, map, dt)
+        local targetNode = self.path[self.pathI]
+        local targetWorldX = (targetNode.x - 1) * Map.TILE_SIZE + Enemy.PATHING_PADDING
+        local targetWorldY = (targetNode.y - 1) * Map.TILE_SIZE + Enemy.PATHING_PADDING
+
+        self.velocityX = targetWorldX - self.x
+        self.velocityY = targetWorldY - self.y
+
+        local velocityMag = math.sqrt(self.velocityX * self.velocityX + self.velocityY * self.velocityY)
+        self.velocityX = self.velocityX / velocityMag * Enemy.SPEED
+        self.velocityY = self.velocityY / velocityMag * Enemy.SPEED
+
         local nextX = self.x + self.velocityX * dt
         local nextY = self.y + self.velocityY * dt
 
         if Collision.checkCollisionRectAndMap(map, nextX, self.y,
-            nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
+                nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
             nextX = self.x
-            self.velocityX = -self.velocityX
+            -- self.velocityX = -self.velocityX
         end
 
         self.x = nextX
 
         if Collision.checkCollisionRectAndMap(map, self.x, nextY,
-            self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
+                self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
             nextY = self.y
-            self.velocityY = -self.velocityY
+            -- self.velocityY = -self.velocityY
         end
 
         self.y = nextY
 
-        self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
-        self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
+        -- self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
+        -- self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
+
+        local distToNodeX = targetWorldX - self.x
+        local distToNodeY = targetWorldY - self.y
+
+        local distToNode = math.sqrt(distToNodeX * distToNodeX + distToNodeY * distToNodeY)
+
+        if distToNode <= Enemy.PATHING_NODE_STOP_DISTANCE and self.pathI > 1 then
+            self.pathI = self.pathI - 1
+        end
+
+        -- local nextX = self.x + self.velocityX * dt
+        -- local nextY = self.y + self.velocityY * dt
+
+        -- if Collision.checkCollisionRectAndMap(map, nextX, self.y,
+        --     nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
+        --     nextX = self.x
+        --     self.velocityX = -self.velocityX
+        -- end
+
+        -- self.x = nextX
+
+        -- if Collision.checkCollisionRectAndMap(map, self.x, nextY,
+        --     self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
+        --     nextY = self.y
+        --     self.velocityY = -self.velocityY
+        -- end
+
+        -- self.y = nextY
+
+        -- self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
+        -- self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
     end
 
     return enemy
@@ -75,8 +124,7 @@ end
 camera:resize(love.graphics.getWidth(), love.graphics.getHeight())
 
 map:setTile(7, 1, 0)
-local cameFrom = Pathfinding.aStarSearch(map, 1, 1, 7, 1)
-local path = Pathfinding.reconstructPath(1, 1, {x = 7, y = 1}, cameFrom)
+local path = Pathfinding.aStar(map, 1, 1, 7, 1)
 local pathI = #path
 
 function love.mousepressed(x, y, button, istouch, presses)
@@ -85,9 +133,20 @@ function love.mousepressed(x, y, button, istouch, presses)
     end
 
     if button == 2 then
-        player.x = (path[pathI].x - 1) * Map.TILE_SIZE
-        player.y = (path[pathI].y - 1) * Map.TILE_SIZE
-        pathI = pathI - 1
+        if pathI >= 1 then
+            player.x = (path[pathI].x - 1) * Map.TILE_SIZE
+            player.y = (path[pathI].y - 1) * Map.TILE_SIZE
+            pathI = pathI - 1
+        end
+
+        for _, enemy in ipairs(enemies) do
+            if enemy.pathI >= 1 then
+                local enemyNode = enemy.path[enemy.pathI]
+                enemy.x = (enemyNode.x - 1) * Map.TILE_SIZE
+                enemy.y = (enemyNode.y - 1) * Map.TILE_SIZE
+                enemy.pathI = enemy.pathI - 1
+            end
+        end
     end
 end
 
