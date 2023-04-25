@@ -98,6 +98,8 @@ function Enemy.new(x, y)
         self.timeToRepath = Enemy.REPATH_DELAY
     end
 
+    enemy:repath()
+
     function enemy.takeDamage(self, damage)
         self.health = self.health - damage
 
@@ -111,11 +113,12 @@ function Enemy.new(x, y)
     function enemy.updatePathing(self, map, dt)
         self.timeToRepath = self.timeToRepath - dt
 
-        if self.timeToRepath <= 0 then
-            self:repath()
-        end
-
+        -- Check if the path is empty.
         if self.pathI < 1 then
+            if self.timeToRepath <= 0 then
+                self:repath()
+            end
+
             return
         end
 
@@ -138,8 +141,16 @@ function Enemy.new(x, y)
 
         local distToNode = math.sqrt(distToNodeX * distToNodeX + distToNodeY * distToNodeY)
 
-        if distToNode <= Enemy.PATHING_NODE_STOP_DISTANCE and self.pathI > 1 then
-            self.pathI = self.pathI - 1
+        -- Check if we need to go to the next node.
+        if distToNode <= Enemy.PATHING_NODE_STOP_DISTANCE then
+            -- Only repath upon reaching a node, otherwise
+            -- pathfinders will cut corners sometimes after
+            -- a repath.
+            if self.timeToRepath <= 0 then
+                self:repath()
+            else
+                self.pathI = self.pathI - 1
+            end
         end
     end
 
