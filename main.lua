@@ -28,11 +28,17 @@ function Enemy.new(x, y)
         velocityX = 0,
         velocityY = 0,
         health = Enemy.MAX_HEALTH,
-        path = Pathfinding.aStar(map, math.floor(x / Map.TILE_SIZE) + 1, math.floor(y / Map.TILE_SIZE) + 1, 1, 1)
+        path = {},
+        pathI = 0,
     }
 
-    enemy.pathI = #enemy.path
-    print(enemy.pathI)
+    function enemy.calculatePath(self)
+        self.path = Pathfinding.aStar(map, math.floor(self.x / Map.TILE_SIZE) + 1,
+            math.floor(self.y / Map.TILE_SIZE) + 1, 1, 1)
+        self.pathI = #self.path
+    end
+
+    enemy:calculatePath()
 
     function enemy.takeDamage(self, damage)
         self.health = self.health - damage
@@ -44,39 +50,20 @@ function Enemy.new(x, y)
         return false
     end
 
-    function enemy.update(self, map, dt)
+    function enemy.updatePathing(self, map, dt)
         local targetNode = self.path[self.pathI]
         local targetWorldX = (targetNode.x - 1) * Map.TILE_SIZE + Enemy.PATHING_PADDING
         local targetWorldY = (targetNode.y - 1) * Map.TILE_SIZE + Enemy.PATHING_PADDING
 
-        self.velocityX = targetWorldX - self.x
-        self.velocityY = targetWorldY - self.y
+        local dx = targetWorldX - self.x
+        local dy = targetWorldY - self.y
 
-        local velocityMag = math.sqrt(self.velocityX * self.velocityX + self.velocityY * self.velocityY)
-        self.velocityX = self.velocityX / velocityMag * Enemy.SPEED
-        self.velocityY = self.velocityY / velocityMag * Enemy.SPEED
+        local dmag = math.sqrt(dx * dx + dy * dy)
+        dx = dx / dmag * Enemy.SPEED * dt
+        dy = dy / dmag * Enemy.SPEED * dt
 
-        local nextX = self.x + self.velocityX * dt
-        local nextY = self.y + self.velocityY * dt
-
-        if Collision.checkCollisionRectAndMap(map, nextX, self.y,
-                nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
-            nextX = self.x
-            -- self.velocityX = -self.velocityX
-        end
-
-        self.x = nextX
-
-        if Collision.checkCollisionRectAndMap(map, self.x, nextY,
-                self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
-            nextY = self.y
-            -- self.velocityY = -self.velocityY
-        end
-
-        self.y = nextY
-
-        -- self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
-        -- self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
+        self.x = self.x + dx
+        self.y = self.y + dy
 
         local distToNodeX = targetWorldX - self.x
         local distToNodeY = targetWorldY - self.y
@@ -86,28 +73,44 @@ function Enemy.new(x, y)
         if distToNode <= Enemy.PATHING_NODE_STOP_DISTANCE and self.pathI > 1 then
             self.pathI = self.pathI - 1
         end
+    end
 
-        -- local nextX = self.x + self.velocityX * dt
-        -- local nextY = self.y + self.velocityY * dt
+    function enemy.updateKnockback(self, map, dt)
+        local nextX = self.x + self.velocityX * dt
+        local nextY = self.y + self.velocityY * dt
 
-        -- if Collision.checkCollisionRectAndMap(map, nextX, self.y,
-        --     nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
-        --     nextX = self.x
-        --     self.velocityX = -self.velocityX
-        -- end
+        if Collision.checkCollisionRectAndMap(map, nextX, self.y,
+            nextX + Enemy.SIZE, self.y + Enemy.SIZE) then
+            nextX = self.x
+            self.velocityX = -self.velocityX
+        end
 
-        -- self.x = nextX
+        self.x = nextX
 
-        -- if Collision.checkCollisionRectAndMap(map, self.x, nextY,
-        --     self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
-        --     nextY = self.y
-        --     self.velocityY = -self.velocityY
-        -- end
+        if Collision.checkCollisionRectAndMap(map, self.x, nextY,
+            self.x + Enemy.SIZE, nextY + Enemy.SIZE) then
+            nextY = self.y
+            self.velocityY = -self.velocityY
+        end
 
-        -- self.y = nextY
+        self.y = nextY
 
-        -- self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
-        -- self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
+        self.velocityX = self.velocityX - self.velocityX * Collision.FRICTION * dt
+        self.velocityY = self.velocityY - self.velocityY * Collision.FRICTION * dt
+    end
+
+    function enemy.update(self, map, dt)
+        if (self.velocityX > 0 or self.velocityY > 0) and (math.abs(self.velocityX) < 1 and math.abs(self.velocityY) < 1) then
+            self.velocityX = 0
+            self.velocityY = 0
+            self:calculatePath()
+        end
+
+        if self.velocityX == 0 and self.velocityY == 0 then
+            self:updatePathing(map, dt)
+        else
+            self:updateKnockback(map, dt)
+        end
     end
 
     return enemy
