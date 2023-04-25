@@ -1,3 +1,56 @@
+
+function love.run()
+    if love.load then
+        love.load(love.arg.parseGameArguments(arg), arg)
+    end
+
+    -- We don't want the first frame's dt to include time taken by love.load.
+    if love.timer then
+        love.timer.step()
+    end
+
+    local dt = 0
+
+    -- Main loop time.
+    return function()
+        -- Process events.
+        if love.event then
+            love.event.pump()
+            for name, a, b, c, d, e, f in love.event.poll() do
+                if name == "quit" then
+                    if not love.quit or not love.quit() then
+                        return a or 0
+                    end
+                end
+                love.handlers[name](a, b, c, d, e, f)
+            end
+        end
+
+        -- Update dt, as we'll be passing it to update
+        if love.timer then
+            dt = love.timer.step()
+        end
+
+        -- Call update and draw
+        if love.update then
+            love.update(dt)
+        end -- will pass 0 if love.timer is disabled
+
+        if love.graphics and love.graphics.isActive() then
+            love.graphics.origin()
+            love.graphics.clear(love.graphics.getBackgroundColor())
+
+            if love.draw then
+                love.draw()
+            end
+
+            love.graphics.present()
+        end
+
+        -- if love.timer then love.timer.sleep(0.001) end
+    end
+end
+
 love.graphics.setDefaultFilter("nearest")
 
 require "player"
@@ -17,6 +70,7 @@ Enemy = {
     SPRITE = love.graphics.newImage("playerOld.png"),
     SIZE = Map.TILE_SIZE * 0.95,
     PATHING_NODE_STOP_DISTANCE = Map.TILE_SIZE * 0.1,
+    REPATH_DELAY = 0.2,
 }
 
 Enemy.PATHING_PADDING = (Map.TILE_SIZE - Enemy.SIZE) * 0.5
@@ -30,15 +84,19 @@ function Enemy.new(x, y)
         health = Enemy.MAX_HEALTH,
         path = {},
         pathI = 0,
+        -- Time until a repath is needed.
+        timeToRepath = 0,
     }
 
-    function enemy.calculatePath(self)
-        self.path = Pathfinding.aStar(map, math.floor(self.x / Map.TILE_SIZE) + 1,
-            math.floor(self.y / Map.TILE_SIZE) + 1, 1, 1)
+    function enemy.repath(self)
+        local startX = math.floor(self.x / Map.TILE_SIZE) + 1
+        local startY = math.floor(self.y / Map.TILE_SIZE) + 1
+        local goalX = math.floor(player.x / Map.TILE_SIZE) + 1
+        local goalY = math.floor(player.y / Map.TILE_SIZE) + 1
+        self.path = Pathfinding.aStar(map, startX, startY, goalX, goalY)
         self.pathI = #self.path
+        self.timeToRepath = Enemy.REPATH_DELAY
     end
-
-    enemy:calculatePath()
 
     function enemy.takeDamage(self, damage)
         self.health = self.health - damage
@@ -51,6 +109,16 @@ function Enemy.new(x, y)
     end
 
     function enemy.updatePathing(self, map, dt)
+        self.timeToRepath = self.timeToRepath - dt
+
+        if self.timeToRepath <= 0 then
+            self:repath()
+        end
+
+        if self.pathI < 1 then
+            return
+        end
+
         local targetNode = self.path[self.pathI]
         local targetWorldX = (targetNode.x - 1) * Map.TILE_SIZE + Enemy.PATHING_PADDING
         local targetWorldY = (targetNode.y - 1) * Map.TILE_SIZE + Enemy.PATHING_PADDING
@@ -100,10 +168,10 @@ function Enemy.new(x, y)
     end
 
     function enemy.update(self, map, dt)
-        if (self.velocityX > 0 or self.velocityY > 0) and (math.abs(self.velocityX) < 1 and math.abs(self.velocityY) < 1) then
+        if (self.velocityX ~= 0 or self.velocityY ~= 0) and (math.abs(self.velocityX) < 1 and math.abs(self.velocityY) < 1) then
             self.velocityX = 0
             self.velocityY = 0
-            self:calculatePath()
+            self:repath()
         end
 
         if self.velocityX == 0 and self.velocityY == 0 then
@@ -202,4 +270,6 @@ function love.draw()
     player:draw()
 
     love.graphics.pop()
+
+    love.graphics.print(love.timer.getFPS(), 0, 0)
 end
